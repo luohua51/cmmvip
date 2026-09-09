@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "kefu/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/admin.html",
+      "dest": "admin.html"
+    },
+    {
+      "src": "/member.html",
+      "dest": "member.html"
+    },
+    {
+      "src": "/logo.png",
+      "dest": "logo.png"
+    },
+    {
+      "src": "/kefu/(.*)",
+      "dest": "kefu/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
+    }
+  ]
+}

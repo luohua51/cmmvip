@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的 · 橙猫猫会员中心</title>
+  <style>
+    :root {
+      --orange: #FF7A00;
+      --orange-deep: #F97316;
+      --orange-light: #FFF3E6;
+      --bg: #f5f6fa;
+      --card: #fff;
+      --line: #eceef3;
+      --text: #1f2937;
+      --sub: #6b7280;
+      --light: #9ca3af;
+      --radius: 0.9rem;
+      --shadow: 0 4px 18px rgba(0,0,0,.06);
+      --transition: all .25s cubic-bezier(.2,.8,.2,1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    img { display: block; max-width: 100%; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    a { text-decoration: none; color: inherit; }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; gap: 1rem;
+      padding: .8rem 1.2rem;
+      background: linear-gradient(135deg,#FF7A00,#F97316);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(255,122,0,.25);
+    }
+    .topbar .brand {
+      display: flex; align-items: center; gap: .55rem;
+      font-weight: 800; font-size: 1.15rem;
+    }
+    .topbar .brand img { width: 2rem; height: 2rem; border-radius: .45rem; border: 2px solid #fff; object-fit: cover; }
+    .topbar .crumb { font-size: .9rem; opacity: .92; }
+    .topbar .spacer { flex: 1; }
+    .topbar .me {
+      font-size: .85rem; background: rgba(255,255,255,.18);
+      padding: .35rem .8rem; border-radius: 999px;
+    }
+    .topbar .logout {
+      font-size: .85rem; font-weight: 700; color: #fff;
+      background: rgba(0,0,0,.18); padding: .4rem .9rem;
+      border-radius: 999px; transition: var(--transition);
+    }
+    .topbar .logout:hover { background: rgba(0,0,0,.32); }
+
+    .main { max-width: 800px; margin: 0 auto; padding: 1.4rem 1.2rem 3rem; }
+
+    .card {
+      background: var(--card); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 1.3rem 1.3rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .balance-row {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: .8rem;
+    }
+    .balance-row .label { font-size: .85rem; color: var(--sub); }
+    .balance-row .amount {
+      font-size: 2.2rem; font-weight: 800;
+      background: linear-gradient(135deg,#FF7A00,#F97316);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .profile-row {
+      display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
+    }
+    .profile-row .info .name { font-weight: 800; font-size: 1.1rem; }
+    .profile-row .info .email { font-size: .85rem; color: var(--sub); }
+
+    .sec-title {
+      font-size: 1rem; font-weight: 800; margin-bottom: .8rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .sec-title .badge {
+      font-size: .7rem; font-weight: 700; padding: .1rem .5rem;
+      border-radius: 999px; background: var(--orange-light); color: var(--orange);
+    }
+
+    .tx-item {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: .7rem 0; border-bottom: 1px solid var(--line);
+      gap: .6rem;
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-item .left { flex: 1; min-width: 0; }
+    .tx-item .left .type {
+      font-weight: 700; font-size: .9rem;
+    }
+    .tx-item .left .type.recharge { color: #059669; }
+    .tx-item .left .type.consume { color: #dc2626; }
+    .tx-item .left .type.refund { color: #6366f1; }
+    .tx-item .left .desc { font-size: .78rem; color: var(--sub); margin-top: .1rem; }
+    .tx-item .left .time { font-size: .72rem; color: var(--light); margin-top: .2rem; }
+    .tx-item .right {
+      text-align: right; flex-shrink: 0;
+    }
+    .tx-item .right .amount {
+      font-weight: 800; font-size: 1rem;
+    }
+    .tx-item .right .amount.recharge { color: #059669; }
+    .tx-item .right .amount.consume { color: #dc2626; }
+    .tx-item .right .operator { font-size: .72rem; color: var(--light); margin-top: .1rem; }
+
+    .empty { text-align: center; padding: 1.5rem; color: var(--light); font-size: .9rem; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 2rem;
+      transform: translateX(-50%) translateY(20px);
+      background: #1f2937; color: #fff; padding: .7rem 1.2rem;
+      border-radius: .7rem; font-size: .85rem;
+      opacity: 0; pointer-events: none; transition: all .3s; z-index: 300;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.ok { background: #059669; }
+
+    .hidden { display: none; }
+
+    .edit-input {
+      border: none;
+      border-bottom: 2px dashed var(--orange-light);
+      background: transparent;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text);
+      outline: none;
+      padding: .1rem .3rem;
+      width: auto;
+      min-width: 4rem;
+    }
+    .edit-input:focus {
+      border-bottom-color: var(--orange);
+    }
+
+    @media (max-width: 480px) {
+      .balance-row .amount { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <div class="brand"><img src="./logo.png" alt="橙猫猫" onerror="this.style.display='none'"/><span>橙猫猫电竞</span></div>
+    <span class="crumb">/ 会员中心</span>
+    <div class="spacer"></div>
+    <span class="me" id="me">会员</span>
+    <button class="logout" id="logout">退出</button>
+  </nav>
+
+  <main class="main">
+    <!-- 会员信息 + 余额 -->
+    <div class="card">
+      <div class="profile-row">
+        <div class="info">
+          <div class="name">
+            昵称：<input class="edit-input" id="nicknameInput" type="text" placeholder="点击修改昵称" />
+            <button class="btn-save-nickname" id="saveNickname" style="font-size:.7rem;color:var(--orange);font-weight:700;padding:.2rem .6rem;border:1px solid var(--orange);border-radius:.4rem;">保存</button>
+          </div>
+          <div class="email" id="email">--</div>
+        </div>
+        <button class="refresh-btn" id="refreshBtn" style="margin-left:auto;padding:.4rem .8rem;border:1px solid var(--line);border-radius:.4rem;font-size:.78rem;color:var(--sub);">⟳ 刷新</button>
+      </div>
+      <hr style="margin: .8rem 0; border: none; border-top: 1px solid var(--line);" />
+      <div class="balance-row">
+        <span class="label">💰 当前余额</span>
+        <span class="amount" id="balance">0.00</span>
+      </div>
+    </div>
+
+    <!-- 流水记录 -->
+    <div class="card">
+      <div class="sec-title">📋 流水记录 <span class="badge" id="txCount">0 条</span></div>
+      <div id="txList"></div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentUser = null;
+
+    function toast(msg, ok) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (ok ? ' ok' : '');
+      setTimeout(() => t.className = 'toast', 2000);
+    }
+
+    async function fetchSession() {
+      const res = await fetch('/api/session');
+      const data = await res.json();
+      if (!data.ok || !data.user) {
+        location.href = '/';
+        return null;
+      }
+      currentUser = data.user;
+      return data.user;
+    }
+
+    async function loadProfile() {
+      const user = await fetchSession();
+      if (!user) return;
+
+      document.getElementById('me').textContent = '会员 ' + (user.nickname || user.email);
+      document.getElementById('nicknameInput').value = user.nickname || '';
+      document.getElementById('email').textContent = user.email || '';
+      document.getElementById('balance').textContent = (user.balance || 0).toFixed(2);
+    }
+
+    async function loadTransactions() {
+      const user = await fetchSession();
+      if (!user) return;
+
+      const res = await fetch('/api/member/transactions');
+      const data = await res.json();
+      if (!data.ok) return;
+
+      const list = data.transactions || [];
+      const container = document.getElementById('txList');
+      document.getElementById('txCount').textContent = list.length + ' 条';
+
+      if (list.length === 0) {
+        container.innerHTML = '<div class="empty">暂无流水记录</div>';
+        return;
+      }
+
+      container.innerHTML = list.map(tx => {
+        const typeMap = {
+          'recharge': '充值',
+          'consume': '消费',
+          'refund': '退款',
+          'adjust': '调整'
+        };
+        const typeClass = tx.type === 'recharge' ? 'recharge' : tx.type === 'consume' ? 'consume' : 'refund';
+        const sign = tx.type === 'recharge' ? '+' : tx.type === 'consume' ? '-' : '±';
+        const opName = tx.operator ? (tx.operator.email || '系统') : '系统';
+
+        return `
+          <div class="tx-item">
+            <div class="left">
+              <div class="type ${typeClass}">${typeMap[tx.type] || tx.type}</div>
+              <div class="desc">${tx.description || ''}</div>
+              <div class="time">${new Date(tx.created_at).toLocaleString('zh-CN')}</div>
+            </div>
+            <div class="right">
+              <div class="amount ${typeClass}">${sign} ${Number(tx.amount).toFixed(2)}</div>
+              <div class="operator">操作人：${opName}</div>
+              <div style="font-size:.7rem;color:var(--light);">余额：${Number(tx.balance_after).toFixed(2)}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 保存昵称
+    document.getElementById('saveNickname').addEventListener('click', async function() {
+      const nickname = document.getElementById('nicknameInput').value.trim();
+      if (!nickname) { toast('请输入昵称'); return; }
+
+      this.disabled = true;
+      this.textContent = '保存中…';
+
+      try {
+        const res = await fetch('/api/member/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('✅ 昵称已更新', true);
+          loadProfile();
+        } else {
+          toast(data.error || '保存失败');
+        }
+      } catch (err) {
+        toast('网络错误');
+      } finally {
+        this.disabled = false;
+        this.textContent = '保存';
+      }
+    });
+
+    function init() {
+      document.getElementById('logout').onclick = async () => {
+        await fetch('/api/logout', { method: 'POST' });
+        location.href = '/';
+      };
+
+      document.getElementById('refreshBtn').onclick = () => {
+        loadProfile();
+        loadTransactions();
+        toast('已刷新', true);
+      };
+
+      loadProfile();
+      loadTransactions();
+
+      setInterval(() => { loadProfile(); loadTransactions(); }, 60000);
+    }
+
+    fetch('/api/session').then(r => r.json()).then(d => {
+      if (!d.ok || !d.user) { location.href = '/'; return; }
+      init();
+    });
+  </script>
+</body>
+</html>

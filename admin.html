@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理后台 · 橙猫猫会员系统</title>
+  <style>
+    :root {
+      --orange: #FF7A00;
+      --orange-deep: #F97316;
+      --orange-light: #FFF3E6;
+      --bg: #f5f6fa;
+      --card: #fff;
+      --line: #eceef3;
+      --text: #1f2937;
+      --sub: #6b7280;
+      --light: #9ca3af;
+      --radius: 0.9rem;
+      --shadow: 0 4px 18px rgba(0,0,0,.06);
+      --transition: all .25s cubic-bezier(.2,.8,.2,1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    img { display: block; max-width: 100%; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    a { text-decoration: none; color: inherit; }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; gap: 1rem;
+      padding: .8rem 1.2rem;
+      background: linear-gradient(135deg,#FF7A00,#F97316);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(255,122,0,.25);
+    }
+    .topbar .brand {
+      display: flex; align-items: center; gap: .55rem;
+      font-weight: 800; font-size: 1.15rem;
+    }
+    .topbar .brand img { width: 2rem; height: 2rem; border-radius: .45rem; border: 2px solid #fff; object-fit: cover; }
+    .topbar .crumb { font-size: .9rem; opacity: .92; }
+    .topbar .spacer { flex: 1; }
+    .topbar .me {
+      font-size: .85rem; background: rgba(255,255,255,.18);
+      padding: .35rem .8rem; border-radius: 999px;
+    }
+    .topbar .logout {
+      font-size: .85rem; font-weight: 700; color: #fff;
+      background: rgba(0,0,0,.18); padding: .4rem .9rem;
+      border-radius: 999px; transition: var(--transition);
+    }
+    .topbar .logout:hover { background: rgba(0,0,0,.32); }
+
+    .main { max-width: 1200px; margin: 0 auto; padding: 1.4rem 1.2rem 3rem; }
+
+    .tabs {
+      display: flex; gap: .5rem; flex-wrap: wrap;
+      margin-bottom: 1.2rem;
+    }
+    .tab {
+      padding: .6rem 1.2rem; border-radius: 999px;
+      font-size: .88rem; font-weight: 700;
+      background: #fff; color: var(--sub);
+      border: 1px solid var(--line);
+      transition: var(--transition);
+    }
+    .tab.active {
+      background: linear-gradient(135deg,#FF7A00,#F97316);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 3px 10px rgba(255,122,0,.3);
+    }
+
+    .card {
+      background: var(--card); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 1.3rem 1.3rem;
+      display: none;
+    }
+    .card.active { display: block; }
+
+    .sec-title {
+      font-size: 1.05rem; font-weight: 800; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .sec-title .badge {
+      font-size: .72rem; font-weight: 700; padding: .15rem .55rem;
+      border-radius: 999px; background: var(--orange-light); color: var(--orange);
+    }
+
+    .toolbar {
+      display: flex; gap: .7rem; flex-wrap: wrap;
+      margin-bottom: 1rem; align-items: center;
+    }
+    .toolbar input, .toolbar select {
+      padding: .5rem .8rem; border: 1px solid var(--line);
+      border-radius: .6rem; font-size: .88rem;
+      background: #fff; outline: none;
+      transition: var(--transition);
+    }
+    .toolbar input:focus, .toolbar select:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255,122,0,.15);
+    }
+
+    .btn {
+      padding: .5rem 1rem; border-radius: .6rem;
+      font-size: .85rem; font-weight: 700;
+      transition: var(--transition);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg,#FF7A00,#F97316);
+      color: #fff; box-shadow: 0 3px 10px rgba(255,122,0,.3);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(255,122,0,.4); }
+    .btn-ghost {
+      background: #fff; color: var(--text); border: 1px solid var(--line);
+    }
+    .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+    .btn-success {
+      background: #059669; color: #fff;
+    }
+    .btn-success:hover { opacity: .85; }
+    .btn-danger {
+      background: #dc2626; color: #fff;
+    }
+    .btn-danger:hover { opacity: .85; }
+    .btn-sm { padding: .3rem .7rem; font-size: .78rem; }
+
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: .88rem;
+    }
+    thead th {
+      background: #fafafa; text-align: left;
+      padding: .6rem .8rem; border-bottom: 2px solid var(--line);
+      font-size: .78rem; color: var(--light); font-weight: 700;
+    }
+    tbody td {
+      padding: .6rem .8rem; border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    tbody tr:hover { background: #fff9f3; }
+    .clickable { cursor: pointer; }
+    .clickable:hover { background: #f5f0eb; }
+
+    .empty { text-align: center; padding: 2rem; color: var(--light); }
+
+    .pill {
+      display: inline-block; padding: .12rem .5rem;
+      border-radius: 999px; font-size: .72rem; font-weight: 700;
+    }
+    .pill.admin { background: #fef3c7; color: #d97706; }
+    .pill.operator { background: #dbeafe; color: #2563eb; }
+    .pill.member { background: #e5e7eb; color: #6b7280; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 2rem;
+      transform: translateX(-50%) translateY(20px);
+      background: #1f2937; color: #fff; padding: .7rem 1.2rem;
+      border-radius: .7rem; font-size: .85rem;
+      opacity: 0; pointer-events: none; transition: all .3s; z-index: 300;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.ok { background: #059669; }
+
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; opacity: 0; visibility: hidden;
+      transition: all .25s; padding: 1rem;
+    }
+    .overlay.show { opacity: 1; visibility: visible; }
+
+    .modal {
+      background: #fff; border-radius: var(--radius);
+      width: 100%; max-width: 32rem; max-height: 90vh;
+      overflow-y: auto; padding: 1.5rem 1.5rem 1.8rem;
+      transform: translateY(10px); transition: transform .3s;
+    }
+    .overlay.show .modal { transform: translateY(0); }
+
+    .modal h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: .3rem; }
+    .modal .sub { font-size: .85rem; color: var(--sub); margin-bottom: 1rem; }
+
+    .group { margin-bottom: .8rem; }
+    .group label {
+      display: block; font-size: .8rem; font-weight: 700;
+      color: var(--sub); margin-bottom: .2rem;
+    }
+    .group input, .group select, .group textarea {
+      width: 100%; padding: .6rem .75rem;
+      border: 1px solid var(--line); border-radius: .55rem;
+      font-size: .9rem; outline: none; transition: var(--transition);
+      font-family: inherit;
+    }
+    .group input:focus, .group select:focus, .group textarea:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255,122,0,.15);
+    }
+    .group textarea { resize: vertical; min-height: 3rem; }
+
+    .modal-actions {
+      display: flex; gap: .6rem; margin-top: 1rem;
+    }
+    .modal-actions .btn { flex: 1; text-align: center; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+
+    .selected-member {
+      background: var(--orange-light); padding: .6rem .8rem;
+      border-radius: .55rem; font-weight: 700;
+      border: 1px solid rgba(255,122,0,.2);
+      margin-bottom: .8rem;
+    }
+
+    @media (max-width: 680px) {
+      .two-col { grid-template-columns: 1fr; }
+      .topbar .crumb { display: none; }
+      table { font-size: .78rem; }
+      thead th, tbody td { padding: .4rem .5rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <div class="brand"><img src="./logo.png" alt="橙猫猫" onerror="this.style.display='none'"/><span>橙猫猫电竞</span></div>
+    <span class="crumb">/ 管理后台</span>
+    <div class="spacer"></div>
+    <span class="me" id="me">管理员</span>
+    <button class="logout" id="logout">退出</button>
+  </nav>
+
+  <main class="main">
+    <div class="tabs">
+      <button class="tab active" data-tab="members">👥 会员管理</button>
+      <button class="tab" data-tab="transactions">📋 全部流水</button>
+    </div>
+
+    <!-- Tab1: 会员管理 -->
+    <div class="card active" id="tab-members">
+      <div class="sec-title">👥 会员列表 <span class="badge" id="memberCount">0 人</span></div>
+      <div class="toolbar">
+        <input id="searchMember" placeholder="搜索昵称/邮箱/手机..." />
+        <button class="btn btn-ghost" id="refreshMembers">⟳ 刷新</button>
+        <button class="btn btn-primary" id="addMemberBtn">➕ 添加会员</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>昵称</th><th>邮箱</th><th>余额</th><th>角色</th><th>操作</th></tr></thead>
+          <tbody id="memberList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab2: 全部流水 -->
+    <div class="card" id="tab-transactions">
+      <div class="sec-title">📋 全部流水 <span class="badge" id="allTxCount">0 条</span></div>
+      <div class="toolbar">
+        <button class="btn btn-ghost" id="refreshTx">⟳ 刷新</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>会员</th><th>类型</th><th>金额</th><th>余额</th><th>备注</th><th>操作人</th><th>时间</th></tr></thead>
+          <tbody id="allTxList"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- 操作模态框（充值/消费） -->
+  <div class="overlay" id="actionOverlay">
+    <div class="modal">
+      <h3 id="actionTitle">操作</h3>
+      <div class="sub" id="actionSub">请填写操作信息</div>
+      <div class="selected-member" id="selectedMember">已选会员：--</div>
+      <input type="hidden" id="actionUserId" />
+
+      <div class="group">
+        <label>操作类型</label>
+        <select id="actionType">
+          <option value="recharge">充值</option>
+          <option value="consume">消费</option>
+        </select>
+      </div>
+
+      <div class="group">
+        <label>金额</label>
+        <input id="actionAmount" type="number" step="0.01" placeholder="请输入金额" />
+      </div>
+
+      <!-- 消费专用字段 -->
+      <div id="consumeFields" style="display:none;">
+        <div class="group">
+          <label>单子类型</label>
+          <select id="orderType">
+            <option value="陪玩下单">陪玩下单</option>
+            <option value="续单">续单</option>
+            <option value="退款">退款</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="two-col">
+          <div class="group"><label>游戏名称</label><input id="gameName" placeholder="如：永劫无间" /></div>
+          <div class="group"><label>陪玩昵称</label><input id="playerName" placeholder="谁接的单" /></div>
+        </div>
+        <div class="two-col">
+          <div class="group"><label>时长</label><input id="duration" placeholder="如：2小时 / 1局" /></div>
+          <div class="group"><label>单价</label><input id="unitPrice" type="number" step="0.01" placeholder="单价" /></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>备注</label>
+        <textarea id="actionRemark" placeholder="备注信息"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelAction">取消</button>
+        <button class="btn btn-primary" id="confirmAction">确认操作</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加会员模态框 -->
+  <div class="overlay" id="addMemberOverlay">
+    <div class="modal">
+      <h3>➕ 添加会员</h3>
+      <div class="sub">创建新会员账号，初始密码将显示在下方</div>
+
+      <div class="group">
+        <label>邮箱账号（必填）</label>
+        <input id="newEmail" type="email" placeholder="请输入邮箱" />
+      </div>
+      <div class="group">
+        <label>初始密码（至少6位）</label>
+        <input id="newPassword" type="text" placeholder="默认：123456" value="123456" />
+      </div>
+      <div class="two-col">
+        <div class="group">
+          <label>昵称</label>
+          <input id="newNickname" placeholder="请输入昵称" />
+        </div>
+        <div class="group">
+          <label>手机号（选填）</label>
+          <input id="newPhone" placeholder="请输入手机号" />
+        </div>
+      </div>
+      <div class="group">
+        <label>角色</label>
+        <select id="newRole">
+          <option value="member">普通会员</option>
+          <option value="operator">客服</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelAddMember">取消</button>
+        <button class="btn btn-primary" id="confirmAddMember">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let members = [];
+    let allTransactions = [];
+    let currentUser = null;
+
+    function toast(msg, ok) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (ok ? ' ok' : '');
+      setTimeout(() => t.className = 'toast', 2000);
+    }
+
+    async function fetchSession() {
+      const res = await fetch('/api/session');
+      const data = await res.json();
+      if (!data.ok || !data.user) { location.href = '/'; return null; }
+      currentUser = data.user;
+      if (currentUser.role !== 'admin' && currentUser.role !== 'operator') {
+        location.href = '/member.html';
+        return null;
+      }
+      document.getElementById('me').textContent = (currentUser.role === 'admin' ? '管理员' : '客服') + ' ' + (currentUser.nickname || currentUser.email);
+      return data.user;
+    }
+
+    async function loadMembers() {
+      const res = await fetch('/api/admin/members');
+      const data = await res.json();
+      if (!data.ok) { toast(data.error || '加载失败'); return; }
+      members = data.members || [];
+      renderMembers();
+    }
+
+    function renderMembers() {
+      const q = document.getElementById('searchMember').value.trim().toLowerCase();
+      let list = members;
+      if (q) {
+        list = list.filter(m =>
+          (m.nickname || '').toLowerCase().includes(q) ||
+          (m.email || '').toLowerCase().includes(q) ||
+          (m.phone || '').toLowerCase().includes(q)
+        );
+      }
+      const tbody = document.getElementById('memberList');
+      document.getElementById('memberCount').textContent = list.length + ' 人';
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">暂无会员</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(m => `
+        <tr>
+          <td><strong>${m.nickname || '未命名'}</strong></td>
+          <td>${m.email || '-'}</td>
+          <td>¥${(m.balance || 0).toFixed(2)}</td>
+          <td><span class="pill ${m.role || 'member'}">${m.role || 'member'}</span></td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="openAction('${m.user_id}', '${m.nickname || m.email}')">操作</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadAllTransactions() {
+      const res = await fetch('/api/admin/transactions');
+      const data = await res.json();
+      if (!data.ok) { toast(data.error || '加载失败'); return; }
+      allTransactions = data.transactions || [];
+      renderAllTransactions();
+    }
+
+    function renderAllTransactions() {
+      const tbody = document.getElementById('allTxList');
+      document.getElementById('allTxCount').textContent = allTransactions.length + ' 条';
+      if (allTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无流水</td></tr>';
+        return;
+      }
+      const typeMap = { 'recharge': '充值', 'consume': '消费', 'refund': '退款', 'adjust': '调整' };
+      tbody.innerHTML = allTransactions.map(tx => `
+        <tr>
+          <td>${tx.member?.nickname || tx.member?.phone || '--'}</td>
+          <td>${typeMap[tx.type] || tx.type}</td>
+          <td>${tx.type === 'recharge' ? '+' : '-'} ¥${Number(tx.amount).toFixed(2)}</td>
+          <td>¥${Number(tx.balance_after).toFixed(2)}</td>
+          <td>${tx.description || '-'}</td>
+          <td>${tx.operator?.email || '系统'}</td>
+          <td>${new Date(tx.created_at).toLocaleString('zh-CN')}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ===== 操作模态框 =====
+    function openAction(userId, nickname) {
+      document.getElementById('actionUserId').value = userId;
+      document.getElementById('selectedMember').textContent = '已选会员：' + (nickname || '--');
+      document.getElementById('actionTitle').textContent = '会员操作';
+      document.getElementById('actionSub').textContent = '充值或消费';
+      document.getElementById('actionAmount').value = '';
+      document.getElementById('actionRemark').value = '';
+      document.getElementById('actionType').value = 'recharge';
+      document.getElementById('consumeFields').style.display = 'none';
+      document.getElementById('gameName').value = '';
+      document.getElementById('playerName').value = '';
+      document.getElementById('duration').value = '';
+      document.getElementById('unitPrice').value = '';
+      document.getElementById('actionOverlay').classList.add('show');
+    }
+
+    function closeAction() {
+      document.getElementById('actionOverlay').classList.remove('show');
+    }
+
+    document.getElementById('actionType').addEventListener('change', function() {
+      document.getElementById('consumeFields').style.display = this.value === 'consume' ? 'block' : 'none';
+    });
+
+    document.getElementById('cancelAction').addEventListener('click', closeAction);
+    document.getElementById('actionOverlay').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeAction();
+    });
+
+    document.getElementById('confirmAction').addEventListener('click', async function() {
+      const userId = document.getElementById('actionUserId').value;
+      const type = document.getElementById('actionType').value;
+      const amount = parseFloat(document.getElementById('actionAmount').value);
+      const remark = document.getElementById('actionRemark').value.trim();
+
+      if (!userId) { toast('请选择会员'); return; }
+      if (!amount || amount <= 0) { toast('请输入有效金额'); return; }
+
+      this.disabled = true;
+      this.textContent = '处理中...';
+
+      try {
+        let url, body;
+        if (type === 'recharge') {
+          url = '/api/admin/recharge';
+          body = { userId, amount, description: remark || '人工充值' };
+        } else {
+          url = '/api/admin/consume';
+          body = {
+            userId,
+            amount,
+            remark: remark || '消费',
+            orderType: document.getElementById('orderType').value,
+            gameName: document.getElementById('gameName').value.trim(),
+            playerName: document.getElementById('playerName').value.trim(),
+            duration: document.getElementById('duration').value.trim(),
+            unitPrice: parseFloat(document.getElementById('unitPrice').value) || 0
+          };
+        }
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('✅ 操作成功，余额：¥' + data.newBalance.toFixed(2), true);
+          closeAction();
+          loadMembers();
+          loadAllTransactions();
+        } else {
+          toast(data.error || '操作失败');
+        }
+      } catch (err) {
+        toast('网络错误，请重试');
+      } finally {
+        this.disabled = false;
+        this.textContent = '确认操作';
+      }
+    });
+
+    // ===== 添加会员 =====
+    document.getElementById('addMemberBtn').addEventListener('click', function() {
+      document.getElementById('newEmail').value = '';
+      document.getElementById('newPassword').value = '123456';
+      document.getElementById('newNickname').value = '';
+      document.getElementById('newPhone').value = '';
+      document.getElementById('newRole').value = 'member';
+      document.getElementById('addMemberOverlay').classList.add('show');
+    });
+
+    document.getElementById('cancelAddMember').addEventListener('click', function() {
+      document.getElementById('addMemberOverlay').classList.remove('show');
+    });
+
+    document.getElementById('addMemberOverlay').addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('show');
+    });
+
+    document.getElementById('confirmAddMember').addEventListener('click', async function() {
+      const email = document.getElementById('newEmail').value.trim();
+      const password = document.getElementById('newPassword').value.trim() || '123456';
+      const nickname = document.getElementById('newNickname').value.trim() || '新会员';
+      const phone = document.getElementById('newPhone').value.trim();
+      const role = document.getElementById('newRole').value;
+
+      if (!email) { toast('请输入邮箱'); return; }
+      if (password.length < 6) { toast('密码至少6位'); return; }
+
+      this.disabled = true;
+      this.textContent = '添加中...';
+
+      try {
+        const res = await fetch('/api/admin/member/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, nickname, phone, role })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('✅ 会员添加成功！密码：' + password, true);
+          document.getElementById('addMemberOverlay').classList.remove('show');
+          loadMembers();
+        } else {
+          toast(data.error || '添加失败');
+        }
+      } catch (err) {
+        toast('网络错误，请重试');
+      } finally {
+        this.disabled = false;
+        this.textContent = '确认添加';
+      }
+    });
+
+    // ===== Tab 切换 =====
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+        if (this.dataset.tab === 'transactions') loadAllTransactions();
+        if (this.dataset.tab === 'members') loadMembers();
+      });
+    });
+
+    // ===== 搜索 =====
+    document.getElementById('searchMember').addEventListener('input', renderMembers);
+    document.getElementById('refreshMembers').addEventListener('click', loadMembers);
+    document.getElementById('refreshTx').addEventListener('click', loadAllTransactions);
+
+    // ===== 退出 =====
+    document.getElementById('logout').onclick = async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      location.href = '/';
+    };
+
+    // ===== 启动 =====
+    (async function init() {
+      const user = await fetchSession();
+      if (!user) return;
+      loadMembers();
+    })();
+  </script>
+</body>
+</html>
