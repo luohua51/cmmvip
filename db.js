@@ -45,10 +45,16 @@ async function getMemberNickname(userId) {
 
 async function getOperatorDisplay(userId) {
   if (!userId) return '系统';
+  
+  // 1. 优先查 member_profiles 的 nickname
   const nickname = await getMemberNickname(userId);
   if (nickname) return nickname;
+  
+  // 2. 查 auth.users 的 email
   const email = await getUserEmail(userId);
   if (email) return email;
+  
+  // 3. 回退：显示 ID 前8位
   return userId.substring(0, 8) + '...';
 }
 

@@ -10,6 +10,7 @@ const session = require('express-session');
 
 const db = require('./db');
 const { supabase } = db;
+const { getOperatorDisplay, getMemberNickname } = db;
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -218,7 +219,6 @@ app.post('/api/member/change-password', requireAuth, wrap(async (req, res) => {
     return res.status(400).json({ ok: false, error: result.error.message });
   }
 
-  // 更新 session 中的标志
   req.session.mustChangePassword = false;
 
   res.json({ ok: true, message: '密码修改成功' });
@@ -234,8 +234,91 @@ app.get('/api/admin/members', requireRole(['admin', 'operator']), wrap(async (re
 }));
 
 app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(async (req, res) => {
-  const transactions = await db.getAllTransactions();
-  res.json({ ok: true, transactions });
+  // 1. 获取会员流水（带余额变动）
+  const { data: txData, error: txError } = await supabase
+    .from('member_transactions')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (txError) {
+    console.error('获取会员流水失败:', txError);
+    return res.status(500).json({ ok: false, error: txError.message });
+  }
+
+  // 2. 获取散客消费（只登记流水）
+  const { data: guestData, error: guestError } = await supabase
+    .from('member_consumptions')
+    .select('*')
+    .is('user_id', null)
+    .order('created_at', { ascending: false });
+
+  if (guestError) {
+    console.error('获取散客消费失败:', guestError);
+    return res.status(500).json({ ok: false, error: guestError.message });
+  }
+
+  // 3. 格式化会员流水
+  const memberTransactions = await Promise.all(
+    (txData || []).map(async (tx) => {
+      const operatorDisplay = await getOperatorDisplay(tx.operator_id);
+      
+      let memberName = '--';
+      if (tx.user_id) {
+        const nickname = await getMemberNickname(tx.user_id);
+        if (nickname) {
+          memberName = nickname;
+        } else {
+          const { data: user } = await supabase
+            .from('auth.users')
+            .select('email')
+            .eq('id', tx.user_id)
+            .maybeSingle();
+          if (user?.email) memberName = user.email;
+        }
+      }
+
+      return {
+        ...tx,
+        type_label: tx.type === 'recharge' ? '充值' : tx.type === 'consume' ? '消费' : tx.type,
+        is_guest: false,
+        member: { nickname: memberName },
+        operator: { email: operatorDisplay }
+      };
+    })
+  );
+
+  // 4. 格式化散客消费（增加操作人显示）
+  const guestTransactions = await Promise.all(
+    (guestData || []).map(async (g) => {
+      let operatorDisplay = '系统';
+      if (g.operator_id) {
+        operatorDisplay = await getOperatorDisplay(g.operator_id);
+      }
+      return {
+        ...g,
+        type: 'consume',
+        type_label: '散客消费',
+        amount: g.total_price || 0,
+        balance_after: null,
+        description: g.remark || '散客消费',
+        created_at: g.created_at,
+        is_guest: true,
+        member: { nickname: '🧾 散客' },
+        operator: { email: operatorDisplay },
+        game_name: g.game_name,
+        player_name: g.player_name,
+        duration: g.duration,
+        order_type: g.order_type,
+        remark: g.remark
+      };
+    })
+  );
+
+  // 5. 合并并按时间排序
+  const allTransactions = [...memberTransactions, ...guestTransactions];
+  allTransactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  res.json({ ok: true, transactions: allTransactions });
 }));
 
 app.post('/api/admin/recharge', requireRole(['admin', 'operator']), wrap(async (req, res) => {
@@ -392,6 +475,45 @@ app.post('/api/admin/reset-password', requireRole(['admin', 'operator']), wrap(a
   }
 
   res.json({ ok: true, message: '密码已重置为 123456' });
+}));
+
+// ============================================================
+//  散客消费登记（含操作人记录）
+// ============================================================
+
+app.post('/api/admin/guest/consume', requireRole(['admin', 'operator']), wrap(async (req, res) => {
+  const { gameName, orderType, playerName, amount, duration, unitPrice, remark } = req.body;
+
+  if (!playerName) {
+    return res.status(400).json({ ok: false, error: '请输入陪玩昵称' });
+  }
+  if (!amount || parseFloat(amount) <= 0) {
+    return res.status(400).json({ ok: false, error: '请输入有效金额' });
+  }
+
+  const { data, error } = await supabase
+    .from('member_consumptions')
+    .insert({
+      user_id: null,
+      transaction_id: null,
+      order_type: orderType || '陪玩下单',
+      game_name: gameName || '',
+      player_name: playerName,
+      duration: duration || '',
+      unit_price: unitPrice || 0,
+      total_price: parseFloat(amount),
+      remark: remark || '散客消费',
+      operator_id: req.session.userId
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('散客消费登记失败:', error);
+    return res.status(400).json({ ok: false, error: error.message });
+  }
+
+  res.json({ ok: true, message: '散客消费已登记', consumption: data });
 }));
 
 // ============================================================

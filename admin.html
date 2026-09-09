@@ -243,6 +243,7 @@
         <input id="searchMember" placeholder="搜索昵称/邮箱/手机..." />
         <button class="btn btn-ghost" id="refreshMembers">⟳ 刷新</button>
         <button class="btn btn-primary" id="addMemberBtn">➕ 添加会员</button>
+        <button class="btn btn-ghost" id="guestConsumeBtn">🧾 散客消费</button>
       </div>
       <div style="overflow-x:auto;">
         <table>
@@ -361,6 +362,66 @@
     </div>
   </div>
 
+  <!-- 散客消费登记弹窗 -->
+  <div class="overlay" id="guestOverlay">
+    <div class="modal">
+      <h3>🧾 散客消费登记</h3>
+      <div class="sub">记录散客消费流水，不扣余额</div>
+
+      <div class="two-col">
+        <div class="group">
+          <label>游戏名称</label>
+          <select id="guestGame">
+            <option value="无畏契约">无畏契约</option>
+            <option value="永劫无间">永劫无间</option>
+            <option value="三角洲行动">三角洲行动</option>
+            <option value="steam热门游戏">Steam热门游戏</option>
+          </select>
+        </div>
+        <div class="group">
+          <label>单子类型</label>
+          <select id="guestOrderType">
+            <option value="陪玩下单">陪玩下单</option>
+            <option value="续单">续单</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="group">
+          <label>陪玩昵称</label>
+          <input id="guestPlayerName" placeholder="谁接的单" />
+        </div>
+        <div class="group">
+          <label>金额</label>
+          <input id="guestAmount" type="number" step="0.01" placeholder="0.00" />
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="group">
+          <label>时长</label>
+          <input id="guestDuration" placeholder="如：2小时 / 1局" />
+        </div>
+        <div class="group">
+          <label>单价</label>
+          <input id="guestUnitPrice" type="number" step="0.01" placeholder="单价" />
+        </div>
+      </div>
+
+      <div class="group">
+        <label>备注</label>
+        <textarea id="guestRemark" placeholder="备注信息"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancelGuest">取消</button>
+        <button class="btn btn-primary" id="confirmGuest">确认登记</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -441,18 +502,38 @@
         tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无流水</td></tr>';
         return;
       }
-      const typeMap = { 'recharge': '充值', 'consume': '消费', 'refund': '退款', 'adjust': '调整' };
-      tbody.innerHTML = allTransactions.map(tx => `
-        <tr>
-          <td>${tx.member?.nickname || tx.member?.phone || '--'}</td>
-          <td>${typeMap[tx.type] || tx.type}</td>
-          <td>${tx.type === 'recharge' ? '+' : '-'} ¥${Number(tx.amount).toFixed(2)}</td>
-          <td>¥${Number(tx.balance_after).toFixed(2)}</td>
-          <td>${tx.description || '-'}</td>
-          <td>${tx.operator?.email || '系统'}</td>
-          <td>${new Date(tx.created_at).toLocaleString('zh-CN')}</td>
-        </tr>
-      `).join('');
+
+      tbody.innerHTML = allTransactions.map(tx => {
+        // 散客消费
+        if (tx.is_guest) {
+          return `
+            <tr>
+              <td>🧾 散客</td>
+              <td>${tx.order_type || '散客消费'}</td>
+              <td>- ¥${Number(tx.amount || 0).toFixed(2)}</td>
+              <td>-</td>
+              <td>${tx.remark || tx.game_name || ''}${tx.player_name ? ' · ' + tx.player_name : ''}${tx.duration ? ' · ' + tx.duration : ''}</td>
+              <td>${tx.operator?.email || '系统'}</td>
+              <td>${new Date(tx.created_at).toLocaleString('zh-CN')}</td>
+            </tr>
+          `;
+        }
+
+        // 会员流水
+        const typeMap = { 'recharge': '充值', 'consume': '消费', 'refund': '退款', 'adjust': '调整' };
+        const sign = tx.type === 'recharge' ? '+' : '-';
+        return `
+          <tr>
+            <td>${tx.member?.nickname || tx.member?.phone || '--'}</td>
+            <td>${typeMap[tx.type] || tx.type}</td>
+            <td>${sign} ¥${Number(tx.amount).toFixed(2)}</td>
+            <td>¥${Number(tx.balance_after || 0).toFixed(2)}</td>
+            <td>${tx.description || '-'}</td>
+            <td>${tx.operator?.email || '系统'}</td>
+            <td>${new Date(tx.created_at).toLocaleString('zh-CN')}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     // ===== 操作模态框 =====
@@ -614,6 +695,71 @@
         toast('网络错误，请重试');
       }
     }
+
+    // ===== 散客消费登记 =====
+    document.getElementById('guestConsumeBtn').addEventListener('click', function() {
+      document.getElementById('guestGame').value = '无畏契约';
+      document.getElementById('guestOrderType').value = '陪玩下单';
+      document.getElementById('guestPlayerName').value = '';
+      document.getElementById('guestAmount').value = '';
+      document.getElementById('guestDuration').value = '';
+      document.getElementById('guestUnitPrice').value = '';
+      document.getElementById('guestRemark').value = '';
+      document.getElementById('guestOverlay').classList.add('show');
+    });
+
+    document.getElementById('cancelGuest').addEventListener('click', function() {
+      document.getElementById('guestOverlay').classList.remove('show');
+    });
+
+    document.getElementById('guestOverlay').addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('show');
+    });
+
+    document.getElementById('confirmGuest').addEventListener('click', async function() {
+      const gameName = document.getElementById('guestGame').value;
+      const orderType = document.getElementById('guestOrderType').value;
+      const playerName = document.getElementById('guestPlayerName').value.trim();
+      const amount = parseFloat(document.getElementById('guestAmount').value);
+      const duration = document.getElementById('guestDuration').value.trim();
+      const unitPrice = parseFloat(document.getElementById('guestUnitPrice').value) || 0;
+      const remark = document.getElementById('guestRemark').value.trim();
+
+      if (!playerName) { toast('请输入陪玩昵称'); return; }
+      if (!amount || amount <= 0) { toast('请输入有效金额'); return; }
+
+      this.disabled = true;
+      this.textContent = '提交中...';
+
+      try {
+        const res = await fetch('/api/admin/guest/consume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gameName,
+            orderType,
+            playerName,
+            amount,
+            duration,
+            unitPrice,
+            remark: remark || '散客消费'
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('✅ 散客消费已登记', true);
+          document.getElementById('guestOverlay').classList.remove('show');
+          loadAllTransactions();
+        } else {
+          toast(data.error || '登记失败');
+        }
+      } catch (err) {
+        toast('网络错误，请重试');
+      } finally {
+        this.disabled = false;
+        this.textContent = '确认登记';
+      }
+    });
 
     // ===== Tab 切换 =====
     document.querySelectorAll('.tab').forEach(tab => {
