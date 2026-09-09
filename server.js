@@ -1,5 +1,6 @@
 // ============================================================
-//  server.js - 橙猫猫会员系统后端 API（无头像功能）
+//  server.js - 橙猫猫会员系统后端 API
+//  兼容 Vercel Serverless 部署
 // ============================================================
 
 require('dotenv').config();
@@ -34,6 +35,7 @@ app.use(
   })
 );
 
+// 静态文件托管（HTML、图片等）
 app.use(express.static(path.join(__dirname), { index: 'index.html' }));
 
 // ============================================================
@@ -69,6 +71,11 @@ function wrap(fn) {
 //  Auth 路由
 // ============================================================
 
+/**
+ * 登录
+ * POST /api/login
+ * Body: { username, password }
+ */
 app.post('/api/login', wrap(async (req, res) => {
   const { username, password } = req.body;
 
@@ -113,6 +120,10 @@ app.post('/api/login', wrap(async (req, res) => {
   });
 }));
 
+/**
+ * 登出
+ * POST /api/logout
+ */
 app.post('/api/logout', (req, res) => {
   req.session.destroy(() => {
     res.clearCookie('member.sid');
@@ -120,6 +131,10 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
+/**
+ * 获取当前用户信息
+ * GET /api/session
+ */
 app.get('/api/session', wrap(async (req, res) => {
   if (!req.session.userId) {
     return res.json({ ok: false });
@@ -149,6 +164,10 @@ app.get('/api/session', wrap(async (req, res) => {
 //  会员资料 API
 // ============================================================
 
+/**
+ * 获取当前会员资料
+ * GET /api/member/profile
+ */
 app.get('/api/member/profile', requireAuth, wrap(async (req, res) => {
   const member = await db.getMemberByUserId(req.session.userId);
   if (!member) {
@@ -157,6 +176,10 @@ app.get('/api/member/profile', requireAuth, wrap(async (req, res) => {
   res.json({ ok: true, profile: member });
 }));
 
+/**
+ * 更新会员资料（昵称、电话）
+ * PUT /api/member/profile
+ */
 app.put('/api/member/profile', requireAuth, wrap(async (req, res) => {
   const { nickname, phone } = req.body;
   const { data, error } = await db.updateMemberProfile(req.session.userId, {
@@ -173,6 +196,10 @@ app.put('/api/member/profile', requireAuth, wrap(async (req, res) => {
 //  会员余额 & 流水 API
 // ============================================================
 
+/**
+ * 获取会员余额
+ * GET /api/member/balance
+ */
 app.get('/api/member/balance', requireAuth, wrap(async (req, res) => {
   const { balance, error } = await db.getMemberBalance(req.session.userId);
   if (error) {
@@ -181,6 +208,10 @@ app.get('/api/member/balance', requireAuth, wrap(async (req, res) => {
   res.json({ ok: true, balance });
 }));
 
+/**
+ * 获取会员流水（当前用户）
+ * GET /api/member/transactions
+ */
 app.get('/api/member/transactions', requireAuth, wrap(async (req, res) => {
   const transactions = await db.getMemberTransactions(req.session.userId);
   res.json({ ok: true, transactions });
@@ -190,33 +221,50 @@ app.get('/api/member/transactions', requireAuth, wrap(async (req, res) => {
 //  管理员 / 客服 API
 // ============================================================
 
+/**
+ * 获取所有会员（管理员/客服）
+ * GET /api/admin/members
+ */
 app.get('/api/admin/members', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const members = await db.getAllMembers();
   res.json({ ok: true, members });
 }));
 
+/**
+ * 获取所有流水（管理员/客服）
+ * GET /api/admin/transactions
+ */
 app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const transactions = await db.getAllTransactions();
   res.json({ ok: true, transactions });
 }));
 
+/**
+ * 充值（管理员/客服）
+ * POST /api/admin/recharge
+ * Body: { userId, amount, description }
+ */
 app.post('/api/admin/recharge', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const { userId, amount, description } = req.body;
+
   if (!userId) {
     return res.status(400).json({ ok: false, error: '请选择会员' });
   }
   if (!amount || parseFloat(amount) <= 0) {
     return res.status(400).json({ ok: false, error: '请输入有效的充值金额' });
   }
+
   const result = await db.createRecharge(
     userId,
     parseFloat(amount),
     description || '人工充值',
     req.session.userId
   );
+
   if (result.error) {
     return res.status(400).json({ ok: false, error: result.error.message });
   }
+
   res.json({
     ok: true,
     message: '充值成功',
@@ -225,14 +273,30 @@ app.post('/api/admin/recharge', requireRole(['admin', 'operator']), wrap(async (
   });
 }));
 
+/**
+ * 消费（管理员/客服）
+ * POST /api/admin/consume
+ * Body: { userId, amount, orderType, gameName, playerName, duration, unitPrice, remark }
+ */
 app.post('/api/admin/consume', requireRole(['admin', 'operator']), wrap(async (req, res) => {
-  const { userId, amount, orderType, gameName, playerName, duration, unitPrice, remark } = req.body;
+  const {
+    userId,
+    amount,
+    orderType,
+    gameName,
+    playerName,
+    duration,
+    unitPrice,
+    remark
+  } = req.body;
+
   if (!userId) {
     return res.status(400).json({ ok: false, error: '请选择会员' });
   }
   if (!amount || parseFloat(amount) <= 0) {
     return res.status(400).json({ ok: false, error: '请输入有效的消费金额' });
   }
+
   const result = await db.createConsume(
     userId,
     parseFloat(amount),
@@ -247,9 +311,11 @@ app.post('/api/admin/consume', requireRole(['admin', 'operator']), wrap(async (r
     remark || '消费',
     req.session.userId
   );
+
   if (result.error) {
     return res.status(400).json({ ok: false, error: result.error.message });
   }
+
   res.json({
     ok: true,
     message: '消费成功',
@@ -259,10 +325,12 @@ app.post('/api/admin/consume', requireRole(['admin', 'operator']), wrap(async (r
   });
 }));
 
-// ============================================================
-//  管理员添加会员
-// ============================================================
-
+/**
+ * 管理员添加会员
+ * POST /api/admin/member/create
+ * Body: { email, password, nickname, phone, role }
+ * 仅管理员可操作
+ */
 app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, res) => {
   const { email, password, nickname, phone, role } = req.body;
 
@@ -273,6 +341,7 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     return res.status(400).json({ ok: false, error: '密码至少6位' });
   }
 
+  // 1. 检查邮箱是否已注册
   const { data: existing } = await supabase
     .from('auth.users')
     .select('id')
@@ -283,6 +352,7 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     return res.status(400).json({ ok: false, error: '该邮箱已注册' });
   }
 
+  // 2. 创建用户
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -295,6 +365,7 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     return res.status(400).json({ ok: false, error: authError.message });
   }
 
+  // 3. 创建会员资料
   const { data: profile, error: profileError } = await supabase
     .from('member_profiles')
     .insert({
@@ -308,6 +379,7 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     .single();
 
   if (profileError) {
+    // 回滚：删除已创建的用户
     await supabase.auth.admin.deleteUser(authData.user.id);
     console.error('创建会员资料失败:', profileError);
     return res.status(400).json({ ok: false, error: profileError.message });
@@ -331,11 +403,16 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================================
-//  启动服务器
+//  导出 app 供 Vercel Serverless 使用（重要！）
 // ============================================================
+module.exports = app;
 
-app.listen(PORT, () => {
-  console.log(`
+// ============================================================
+//  本地开发启动（仅在直接运行 node server.js 时执行）
+// ============================================================
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`
   ╔═══════════════════════════════════════════════════╗
   ║   🐱 橙猫猫会员系统已启动                         ║
   ║   http://localhost:${PORT}                        ║
@@ -344,5 +421,6 @@ app.listen(PORT, () => {
   ║   会员中心: http://localhost:${PORT}/member.html   ║
   ║   管理员: http://localhost:${PORT}/admin.html      ║
   ╚═══════════════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+}
