@@ -35,7 +35,6 @@ app.use(
   })
 );
 
-// 静态文件托管（HTML、图片等）
 app.use(express.static(path.join(__dirname), { index: 'index.html' }));
 
 // ============================================================
@@ -71,11 +70,6 @@ function wrap(fn) {
 //  Auth 路由
 // ============================================================
 
-/**
- * 登录
- * POST /api/login
- * Body: { username, password }
- */
 app.post('/api/login', wrap(async (req, res) => {
   const { username, password } = req.body;
 
@@ -115,15 +109,12 @@ app.post('/api/login', wrap(async (req, res) => {
       id: authData.user.id,
       email: authData.user.email,
       role: member.role,
-      nickname: member.nickname
+      nickname: member.nickname,
+      mustChangePassword: member.must_change_password || false
     }
   });
 }));
 
-/**
- * 登出
- * POST /api/logout
- */
 app.post('/api/logout', (req, res) => {
   req.session.destroy(() => {
     res.clearCookie('member.sid');
@@ -131,10 +122,6 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-/**
- * 获取当前用户信息
- * GET /api/session
- */
 app.get('/api/session', wrap(async (req, res) => {
   if (!req.session.userId) {
     return res.json({ ok: false });
@@ -155,7 +142,8 @@ app.get('/api/session', wrap(async (req, res) => {
       profileId: req.session.profileId,
       nickname: member.nickname,
       phone: member.phone,
-      balance: member.balance
+      balance: member.balance,
+      mustChangePassword: member.must_change_password || false
     }
   });
 }));
@@ -164,10 +152,6 @@ app.get('/api/session', wrap(async (req, res) => {
 //  会员资料 API
 // ============================================================
 
-/**
- * 获取当前会员资料
- * GET /api/member/profile
- */
 app.get('/api/member/profile', requireAuth, wrap(async (req, res) => {
   const member = await db.getMemberByUserId(req.session.userId);
   if (!member) {
@@ -176,10 +160,6 @@ app.get('/api/member/profile', requireAuth, wrap(async (req, res) => {
   res.json({ ok: true, profile: member });
 }));
 
-/**
- * 更新会员资料（昵称、电话）
- * PUT /api/member/profile
- */
 app.put('/api/member/profile', requireAuth, wrap(async (req, res) => {
   const { nickname, phone } = req.body;
   const { data, error } = await db.updateMemberProfile(req.session.userId, {
@@ -196,10 +176,6 @@ app.put('/api/member/profile', requireAuth, wrap(async (req, res) => {
 //  会员余额 & 流水 API
 // ============================================================
 
-/**
- * 获取会员余额
- * GET /api/member/balance
- */
 app.get('/api/member/balance', requireAuth, wrap(async (req, res) => {
   const { balance, error } = await db.getMemberBalance(req.session.userId);
   if (error) {
@@ -208,42 +184,60 @@ app.get('/api/member/balance', requireAuth, wrap(async (req, res) => {
   res.json({ ok: true, balance });
 }));
 
-/**
- * 获取会员流水（当前用户）
- * GET /api/member/transactions
- */
 app.get('/api/member/transactions', requireAuth, wrap(async (req, res) => {
   const transactions = await db.getMemberTransactions(req.session.userId);
   res.json({ ok: true, transactions });
 }));
 
 // ============================================================
+//  修改密码
+// ============================================================
+
+app.get('/api/member/check-password', requireAuth, wrap(async (req, res) => {
+  const mustChange = await db.checkMustChangePassword(req.session.userId);
+  res.json({ ok: true, mustChange });
+}));
+
+app.post('/api/member/change-password', requireAuth, wrap(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ ok: false, error: '请填写完整信息' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ ok: false, error: '新密码至少6位' });
+  }
+
+  const result = await db.changeMemberPassword(
+    req.session.userId,
+    oldPassword,
+    newPassword
+  );
+
+  if (result.error) {
+    return res.status(400).json({ ok: false, error: result.error.message });
+  }
+
+  // 更新 session 中的标志
+  req.session.mustChangePassword = false;
+
+  res.json({ ok: true, message: '密码修改成功' });
+}));
+
+// ============================================================
 //  管理员 / 客服 API
 // ============================================================
 
-/**
- * 获取所有会员（管理员/客服）
- * GET /api/admin/members
- */
 app.get('/api/admin/members', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const members = await db.getAllMembers();
   res.json({ ok: true, members });
 }));
 
-/**
- * 获取所有流水（管理员/客服）
- * GET /api/admin/transactions
- */
 app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const transactions = await db.getAllTransactions();
   res.json({ ok: true, transactions });
 }));
 
-/**
- * 充值（管理员/客服）
- * POST /api/admin/recharge
- * Body: { userId, amount, description }
- */
 app.post('/api/admin/recharge', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const { userId, amount, description } = req.body;
 
@@ -273,11 +267,6 @@ app.post('/api/admin/recharge', requireRole(['admin', 'operator']), wrap(async (
   });
 }));
 
-/**
- * 消费（管理员/客服）
- * POST /api/admin/consume
- * Body: { userId, amount, orderType, gameName, playerName, duration, unitPrice, remark }
- */
 app.post('/api/admin/consume', requireRole(['admin', 'operator']), wrap(async (req, res) => {
   const {
     userId,
@@ -325,12 +314,6 @@ app.post('/api/admin/consume', requireRole(['admin', 'operator']), wrap(async (r
   });
 }));
 
-/**
- * 管理员添加会员
- * POST /api/admin/member/create
- * Body: { email, password, nickname, phone, role }
- * 仅管理员可操作
- */
 app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, res) => {
   const { email, password, nickname, phone, role } = req.body;
 
@@ -341,7 +324,6 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     return res.status(400).json({ ok: false, error: '密码至少6位' });
   }
 
-  // 1. 检查邮箱是否已注册
   const { data: existing } = await supabase
     .from('auth.users')
     .select('id')
@@ -352,7 +334,6 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     return res.status(400).json({ ok: false, error: '该邮箱已注册' });
   }
 
-  // 2. 创建用户
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -365,7 +346,6 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
     return res.status(400).json({ ok: false, error: authError.message });
   }
 
-  // 3. 创建会员资料
   const { data: profile, error: profileError } = await supabase
     .from('member_profiles')
     .insert({
@@ -373,13 +353,13 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
       nickname: nickname || email.split('@')[0],
       phone: phone || '',
       role: role || 'member',
-      balance: 0
+      balance: 0,
+      must_change_password: true
     })
     .select()
     .single();
 
   if (profileError) {
-    // 回滚：删除已创建的用户
     await supabase.auth.admin.deleteUser(authData.user.id);
     console.error('创建会员资料失败:', profileError);
     return res.status(400).json({ ok: false, error: profileError.message });
@@ -393,6 +373,27 @@ app.post('/api/admin/member/create', requireRole(['admin']), wrap(async (req, re
   });
 }));
 
+app.post('/api/admin/reset-password', requireRole(['admin', 'operator']), wrap(async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ ok: false, error: '请选择会员' });
+  }
+
+  const member = await db.getMemberByUserId(userId);
+  if (!member) {
+    return res.status(404).json({ ok: false, error: '会员不存在' });
+  }
+
+  const result = await db.resetPasswordToDefault(userId);
+
+  if (result.error) {
+    return res.status(400).json({ ok: false, error: result.error.message });
+  }
+
+  res.json({ ok: true, message: '密码已重置为 123456' });
+}));
+
 // ============================================================
 //  全局错误处理
 // ============================================================
@@ -403,12 +404,12 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================================
-//  导出 app 供 Vercel Serverless 使用（重要！）
+//  导出 app 供 Vercel Serverless 使用
 // ============================================================
 module.exports = app;
 
 // ============================================================
-//  本地开发启动（仅在直接运行 node server.js 时执行）
+//  本地开发启动
 // ============================================================
 if (require.main === module) {
   app.listen(PORT, () => {

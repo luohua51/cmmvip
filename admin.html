@@ -121,14 +121,10 @@
       background: #fff; color: var(--text); border: 1px solid var(--line);
     }
     .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
-    .btn-success {
-      background: #059669; color: #fff;
+    .btn-warning {
+      background: #f59e0b; color: #fff;
     }
-    .btn-success:hover { opacity: .85; }
-    .btn-danger {
-      background: #dc2626; color: #fff;
-    }
-    .btn-danger:hover { opacity: .85; }
+    .btn-warning:hover { opacity: .85; }
     .btn-sm { padding: .3rem .7rem; font-size: .78rem; }
 
     table {
@@ -145,8 +141,6 @@
       vertical-align: middle;
     }
     tbody tr:hover { background: #fff9f3; }
-    .clickable { cursor: pointer; }
-    .clickable:hover { background: #f5f0eb; }
 
     .empty { text-align: center; padding: 2rem; color: var(--light); }
 
@@ -426,6 +420,7 @@
           <td><span class="pill ${m.role || 'member'}">${m.role || 'member'}</span></td>
           <td>
             <button class="btn btn-primary btn-sm" onclick="openAction('${m.user_id}', '${m.nickname || m.email}')">操作</button>
+            <button class="btn btn-warning btn-sm" onclick="resetPassword('${m.user_id}', '${m.nickname || m.email}')">重置密码</button>
           </td>
         </tr>
       `).join('');
@@ -595,6 +590,30 @@
         this.textContent = '确认添加';
       }
     });
+
+    // ===== 重置密码 =====
+    async function resetPassword(userId, nickname) {
+      if (!confirm(`确定将「${nickname}」的密码重置为 123456 吗？\n重置后该会员下次登录需修改密码。`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('✅ 密码已重置为 123456', true);
+          loadMembers();
+        } else {
+          toast(data.error || '重置失败');
+        }
+      } catch (err) {
+        toast('网络错误，请重试');
+      }
+    }
 
     // ===== Tab 切换 =====
     document.querySelectorAll('.tab').forEach(tab => {

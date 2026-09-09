@@ -128,7 +128,65 @@
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .toast.ok { background: #059669; }
 
-    .hidden { display: none; }
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 1rem;
+    }
+    .overlay.show { display: flex; }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 2rem;
+      max-width: 380px;
+      width: 90%;
+      transform: translateY(10px);
+      transition: transform .3s;
+    }
+    .overlay.show .modal-box { transform: translateY(0); }
+
+    .modal-box h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: .3rem; }
+    .modal-box .sub { font-size: .85rem; color: var(--sub); margin-bottom: 1rem; }
+
+    .group { margin-bottom: .8rem; }
+    .group label {
+      display: block; font-size: .8rem; font-weight: 700;
+      color: var(--sub); margin-bottom: .2rem;
+    }
+    .group input {
+      width: 100%; padding: .6rem .75rem;
+      border: 1px solid var(--line); border-radius: .55rem;
+      font-size: .9rem; outline: none; transition: var(--transition);
+      font-family: inherit;
+    }
+    .group input:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255,122,0,.15);
+    }
+
+    .modal-actions {
+      display: flex; gap: .6rem; margin-top: .6rem;
+    }
+    .modal-actions .btn {
+      flex: 1; padding: .7rem; border-radius: .6rem;
+      font-weight: 700; font-size: .85rem; text-align: center;
+    }
+    .btn-ghost {
+      background: #fff; color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .btn-ghost:hover { border-color: var(--orange); color: var(--orange); }
+    .btn-primary {
+      background: linear-gradient(135deg,#FF7A00,#F97316);
+      color: #fff; border: none;
+    }
+    .btn-primary:hover { opacity: .9; }
 
     .edit-input {
       border: none;
@@ -142,8 +200,25 @@
       width: auto;
       min-width: 4rem;
     }
-    .edit-input:focus {
-      border-bottom-color: var(--orange);
+    .edit-input:focus { border-bottom-color: var(--orange); }
+
+    .btn-save-nickname {
+      font-size: .7rem; color: var(--orange); font-weight: 700;
+      padding: .2rem .6rem; border: 1px solid var(--orange);
+      border-radius: .4rem; background: transparent;
+    }
+    .btn-save-nickname:hover { background: var(--orange); color: #fff; }
+
+    .refresh-btn {
+      padding: .4rem .8rem; border: 1px solid var(--line);
+      border-radius: .4rem; font-size: .78rem; color: var(--sub);
+      background: transparent;
+    }
+    .refresh-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+    #pwMsg {
+      font-size: .82rem; color: #ef4444; min-height: 1.2rem;
+      margin-bottom: .6rem;
     }
 
     @media (max-width: 480px) {
@@ -167,11 +242,11 @@
         <div class="info">
           <div class="name">
             昵称：<input class="edit-input" id="nicknameInput" type="text" placeholder="点击修改昵称" />
-            <button class="btn-save-nickname" id="saveNickname" style="font-size:.7rem;color:var(--orange);font-weight:700;padding:.2rem .6rem;border:1px solid var(--orange);border-radius:.4rem;">保存</button>
+            <button class="btn-save-nickname" id="saveNickname">保存</button>
           </div>
           <div class="email" id="email">--</div>
         </div>
-        <button class="refresh-btn" id="refreshBtn" style="margin-left:auto;padding:.4rem .8rem;border:1px solid var(--line);border-radius:.4rem;font-size:.78rem;color:var(--sub);">⟳ 刷新</button>
+        <button class="refresh-btn" id="refreshBtn">⟳ 刷新</button>
       </div>
       <hr style="margin: .8rem 0; border: none; border-top: 1px solid var(--line);" />
       <div class="balance-row">
@@ -186,6 +261,34 @@
       <div id="txList"></div>
     </div>
   </main>
+
+  <!-- 修改密码弹窗 -->
+  <div class="overlay" id="pwOverlay">
+    <div class="modal-box">
+      <h3>🔒 修改密码</h3>
+      <p class="sub" id="pwHint">检测到您正在使用默认密码，请立即修改</p>
+
+      <div class="group">
+        <label>当前密码</label>
+        <input id="pwOld" type="password" placeholder="请输入当前密码" />
+      </div>
+      <div class="group">
+        <label>新密码（至少6位）</label>
+        <input id="pwNew" type="password" placeholder="请输入新密码" />
+      </div>
+      <div class="group">
+        <label>确认新密码</label>
+        <input id="pwNew2" type="password" placeholder="请再次输入新密码" />
+      </div>
+
+      <div id="pwMsg"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="pwCancel">暂不修改</button>
+        <button class="btn btn-primary" id="pwSave">确认修改</button>
+      </div>
+    </div>
+  </div>
 
   <div class="toast" id="toast"></div>
 
@@ -265,7 +368,82 @@
       }).join('');
     }
 
-    // 保存昵称
+    // ===== 修改密码弹窗 =====
+    const pwOverlay = document.getElementById('pwOverlay');
+    const pwOld = document.getElementById('pwOld');
+    const pwNew = document.getElementById('pwNew');
+    const pwNew2 = document.getElementById('pwNew2');
+    const pwMsg = document.getElementById('pwMsg');
+
+    function openPwModal(force) {
+      pwOverlay.classList.add('show');
+      pwOld.value = '';
+      pwNew.value = '';
+      pwNew2.value = '';
+      pwMsg.textContent = '';
+      if (force) {
+        document.getElementById('pwHint').textContent = '⚠️ 检测到您正在使用默认密码，请立即修改';
+      } else {
+        document.getElementById('pwHint').textContent = '修改密码';
+      }
+    }
+
+    function closePwModal() {
+      pwOverlay.classList.remove('show');
+    }
+
+    document.getElementById('pwCancel').addEventListener('click', closePwModal);
+    pwOverlay.addEventListener('click', function(e) {
+      if (e.target === this) closePwModal();
+    });
+
+    document.getElementById('pwSave').addEventListener('click', async function() {
+      const oldPw = pwOld.value;
+      const newPw = pwNew.value;
+      const newPw2 = pwNew2.value;
+
+      if (!oldPw) { pwMsg.textContent = '请输入当前密码'; return; }
+      if (newPw.length < 6) { pwMsg.textContent = '新密码至少6位'; return; }
+      if (newPw !== newPw2) { pwMsg.textContent = '两次密码不一致'; return; }
+
+      this.disabled = true;
+      this.textContent = '修改中…';
+
+      try {
+        const res = await fetch('/api/member/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('✅ 密码修改成功', true);
+          closePwModal();
+          loadProfile();
+        } else {
+          pwMsg.textContent = data.error || '修改失败';
+        }
+      } catch (err) {
+        pwMsg.textContent = '网络错误，请重试';
+      } finally {
+        this.disabled = false;
+        this.textContent = '确认修改';
+      }
+    });
+
+    async function checkPasswordStatus() {
+      try {
+        const res = await fetch('/api/member/check-password');
+        const data = await res.json();
+        if (data.ok && data.mustChange) {
+          setTimeout(() => openPwModal(true), 500);
+        }
+      } catch (err) {
+        console.log('检查密码状态失败:', err);
+      }
+    }
+
+    // ===== 保存昵称 =====
     document.getElementById('saveNickname').addEventListener('click', async function() {
       const nickname = document.getElementById('nicknameInput').value.trim();
       if (!nickname) { toast('请输入昵称'); return; }
@@ -294,7 +472,8 @@
       }
     });
 
-    function init() {
+    // ===== 初始化 =====
+    async function init() {
       document.getElementById('logout').onclick = async () => {
         await fetch('/api/logout', { method: 'POST' });
         location.href = '/';
@@ -306,8 +485,9 @@
         toast('已刷新', true);
       };
 
-      loadProfile();
-      loadTransactions();
+      await loadProfile();
+      await loadTransactions();
+      await checkPasswordStatus();
 
       setInterval(() => { loadProfile(); loadTransactions(); }, 60000);
     }

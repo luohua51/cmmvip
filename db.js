@@ -1,5 +1,5 @@
 // ============================================================
-//  db.js - 橙猫猫会员系统数据库操作（无头像功能）
+//  db.js - 橙猫猫会员系统数据库操作
 // ============================================================
 
 require('dotenv').config();
@@ -102,7 +102,8 @@ async function createMemberProfile(userId, nickname, phone) {
       nickname: nickname || '新会员',
       phone: phone || '',
       role: 'member',
-      balance: 0
+      balance: 0,
+      must_change_password: true
     })
     .select()
     .single();
@@ -132,6 +133,90 @@ async function getMemberBalance(userId) {
     .single();
   if (error) return { error };
   return { balance: data.balance };
+}
+
+// ============================================================
+//  强制修改密码
+// ============================================================
+
+async function checkMustChangePassword(userId) {
+  const { data, error } = await supabase
+    .from('member_profiles')
+    .select('must_change_password')
+    .eq('user_id', userId)
+    .single();
+  if (error) return false;
+  return data?.must_change_password || false;
+}
+
+async function setMustChangePassword(userId, value) {
+  const { error } = await supabase
+    .from('member_profiles')
+    .update({ must_change_password: value })
+    .eq('user_id', userId);
+  if (error) {
+    console.error('设置强制修改密码失败:', error);
+    return { error };
+  }
+  return { success: true };
+}
+
+async function resetPasswordToDefault(userId) {
+  const { data: user, error: userError } = await supabase
+    .from('auth.users')
+    .select('email')
+    .eq('id', userId)
+    .single();
+
+  if (userError) {
+    return { error: { message: '用户不存在' } };
+  }
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    password: '123456'
+  });
+
+  if (updateError) {
+    console.error('重置密码失败:', updateError);
+    return { error: updateError };
+  }
+
+  await setMustChangePassword(userId, true);
+
+  return { success: true };
+}
+
+async function changeMemberPassword(userId, oldPassword, newPassword) {
+  const { data: user, error: userError } = await supabase
+    .from('auth.users')
+    .select('email')
+    .eq('id', userId)
+    .single();
+
+  if (userError) {
+    return { error: { message: '用户不存在' } };
+  }
+
+  const { error: signError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: oldPassword
+  });
+
+  if (signError) {
+    return { error: { message: '原密码错误' } };
+  }
+
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    password: newPassword
+  });
+
+  if (updateError) {
+    return { error: updateError };
+  }
+
+  await setMustChangePassword(userId, false);
+
+  return { success: true };
 }
 
 // ============================================================
@@ -210,10 +295,6 @@ async function getAllTransactions() {
 
   return withDetails;
 }
-
-// ============================================================
-//  充值 & 消费
-// ============================================================
 
 async function createRecharge(userId, amount, description, operatorId) {
   const { data: profile, error: getError } = await supabase
@@ -345,6 +426,10 @@ module.exports = {
   createMemberProfile,
   updateMemberProfile,
   getMemberBalance,
+  checkMustChangePassword,
+  setMustChangePassword,
+  resetPasswordToDefault,
+  changeMemberPassword,
   getMemberTransactions,
   getAllTransactions,
   createRecharge,
