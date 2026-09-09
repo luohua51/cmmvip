@@ -7,6 +7,7 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const { createClient } = require('@supabase/supabase-js');
 
 const db = require('./db');
 const { supabase } = db;
@@ -14,6 +15,15 @@ const { getOperatorDisplay, getMemberNickname } = db;
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ============================================================
+//  跨项目客户端：陪玩系统（用于读取陪玩列表）
+// ============================================================
+
+const PLAYERS_SUPABASE_URL = 'https://xqtepnlmgtbvlhbvraga.supabase.co';
+const PLAYERS_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxdGVwbmxtZ3RidmxoYnZyYWdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzUwMDAsImV4cCI6MjEwNDUxMTAwMH0.7aIcOi0f2kWQaz9uF24iomkpgZyvU-V9HG9lx1weYaM';
+
+const playersSupabase = createClient(PLAYERS_SUPABASE_URL, PLAYERS_SUPABASE_ANON_KEY);
 
 // ============================================================
 //  中间件
@@ -234,7 +244,6 @@ app.get('/api/admin/members', requireRole(['admin', 'operator']), wrap(async (re
 }));
 
 app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(async (req, res) => {
-  // 1. 获取会员流水（带余额变动）
   const { data: txData, error: txError } = await supabase
     .from('member_transactions')
     .select('*')
@@ -245,7 +254,6 @@ app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(asyn
     return res.status(500).json({ ok: false, error: txError.message });
   }
 
-  // 2. 获取散客消费（只登记流水）
   const { data: guestData, error: guestError } = await supabase
     .from('member_consumptions')
     .select('*')
@@ -257,7 +265,7 @@ app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(asyn
     return res.status(500).json({ ok: false, error: guestError.message });
   }
 
-  // 3. 格式化会员流水
+  // ★★★ 格式化会员流水（已包含 player_name）★★★
   const memberTransactions = await Promise.all(
     (txData || []).map(async (tx) => {
       const operatorDisplay = await getOperatorDisplay(tx.operator_id);
@@ -277,17 +285,29 @@ app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(asyn
         }
       }
 
+      // ★★★ 查询陪玩名字 ★★★
+      let playerName = null;
+      if (tx.type === 'consume' && tx.id) {
+        const { data: consume } = await supabase
+          .from('member_consumptions')
+          .select('player_name')
+          .eq('transaction_id', tx.id)
+          .maybeSingle();
+        if (consume) playerName = consume.player_name;
+      }
+
       return {
         ...tx,
         type_label: tx.type === 'recharge' ? '充值' : tx.type === 'consume' ? '消费' : tx.type,
         is_guest: false,
         member: { nickname: memberName },
-        operator: { email: operatorDisplay }
+        operator: { email: operatorDisplay },
+        player_name: playerName || null  // ★★★ 新增 ★★★
       };
     })
   );
 
-  // 4. 格式化散客消费（增加操作人显示）
+  // 散客消费格式化（已有 player_name）
   const guestTransactions = await Promise.all(
     (guestData || []).map(async (g) => {
       let operatorDisplay = '系统';
@@ -305,8 +325,8 @@ app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(asyn
         is_guest: true,
         member: { nickname: '🧾 散客' },
         operator: { email: operatorDisplay },
+        player_name: g.player_name || null,
         game_name: g.game_name,
-        player_name: g.player_name,
         duration: g.duration,
         order_type: g.order_type,
         remark: g.remark
@@ -314,7 +334,6 @@ app.get('/api/admin/transactions', requireRole(['admin', 'operator']), wrap(asyn
     })
   );
 
-  // 5. 合并并按时间排序
   const allTransactions = [...memberTransactions, ...guestTransactions];
   allTransactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -485,7 +504,7 @@ app.post('/api/admin/guest/consume', requireRole(['admin', 'operator']), wrap(as
   const { gameName, orderType, playerName, amount, duration, unitPrice, remark } = req.body;
 
   if (!playerName) {
-    return res.status(400).json({ ok: false, error: '请输入陪玩昵称' });
+    return res.status(400).json({ ok: false, error: '请选择陪玩' });
   }
   if (!amount || parseFloat(amount) <= 0) {
     return res.status(400).json({ ok: false, error: '请输入有效金额' });
@@ -514,6 +533,29 @@ app.post('/api/admin/guest/consume', requireRole(['admin', 'operator']), wrap(as
   }
 
   res.json({ ok: true, message: '散客消费已登记', consumption: data });
+}));
+
+// ============================================================
+//  获取陪玩列表（跨项目读取陪玩系统的 players 表）
+// ============================================================
+
+app.get('/api/players/names', requireRole(['admin', 'operator']), wrap(async (req, res) => {
+  try {
+    const { data, error } = await playersSupabase
+      .from('players')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('获取陪玩列表失败:', error);
+      return res.status(500).json({ ok: false, error: error.message });
+    }
+
+    res.json({ ok: true, players: data || [] });
+  } catch (err) {
+    console.error('跨项目请求失败:', err);
+    res.status(500).json({ ok: false, error: err.message || '请求失败' });
+  }
 }));
 
 // ============================================================

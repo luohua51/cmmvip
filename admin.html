@@ -261,7 +261,7 @@
       </div>
       <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>会员</th><th>类型</th><th>金额</th><th>余额</th><th>备注</th><th>操作人</th><th>时间</th></tr></thead>
+          <thead><tr><th>会员</th><th>陪玩</th><th>类型</th><th>金额</th><th>余额</th><th>备注</th><th>操作人</th><th>时间</th></tr></thead>
           <tbody id="allTxList"></tbody>
         </table>
       </div>
@@ -302,7 +302,12 @@
         </div>
         <div class="two-col">
           <div class="group"><label>游戏名称</label><input id="gameName" placeholder="如：永劫无间" /></div>
-          <div class="group"><label>陪玩昵称</label><input id="playerName" placeholder="谁接的单" /></div>
+          <div class="group">
+            <label>陪玩昵称</label>
+            <select id="playerName">
+              <option value="">请选择陪玩</option>
+            </select>
+          </div>
         </div>
         <div class="two-col">
           <div class="group"><label>时长</label><input id="duration" placeholder="如：2小时 / 1局" /></div>
@@ -391,7 +396,9 @@
       <div class="two-col">
         <div class="group">
           <label>陪玩昵称</label>
-          <input id="guestPlayerName" placeholder="谁接的单" />
+          <select id="guestPlayerName">
+            <option value="">请选择陪玩</option>
+          </select>
         </div>
         <div class="group">
           <label>金额</label>
@@ -449,6 +456,32 @@
       return data.user;
     }
 
+    // ★★★ 加载陪玩列表到下拉选择框 ★★★
+    async function loadPlayersForSelect() {
+      try {
+        const res = await fetch('/api/players/names');
+        const data = await res.json();
+        if (!data.ok) {
+          console.log('加载陪玩列表失败:', data.error);
+          return;
+        }
+        // 填充两个下拉框
+        ['playerName', 'guestPlayerName'].forEach(id => {
+          const select = document.getElementById(id);
+          if (!select) return;
+          select.innerHTML = '<option value="">请选择陪玩</option>';
+          data.players.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = p.name;
+            select.appendChild(opt);
+          });
+        });
+      } catch (err) {
+        console.log('加载陪玩列表失败:', err);
+      }
+    }
+
     async function loadMembers() {
       const res = await fetch('/api/admin/members');
       const data = await res.json();
@@ -499,32 +532,32 @@
       const tbody = document.getElementById('allTxList');
       document.getElementById('allTxCount').textContent = allTransactions.length + ' 条';
       if (allTransactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无流水</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无流水</td></tr>';
         return;
       }
 
       tbody.innerHTML = allTransactions.map(tx => {
-        // 散客消费
         if (tx.is_guest) {
           return `
             <tr>
               <td>🧾 散客</td>
+              <td>${tx.player_name || '-'}</td>
               <td>${tx.order_type || '散客消费'}</td>
               <td>- ¥${Number(tx.amount || 0).toFixed(2)}</td>
               <td>-</td>
-              <td>${tx.remark || tx.game_name || ''}${tx.player_name ? ' · ' + tx.player_name : ''}${tx.duration ? ' · ' + tx.duration : ''}</td>
+              <td>${tx.remark || tx.game_name || ''}${tx.duration ? ' · ' + tx.duration : ''}</td>
               <td>${tx.operator?.email || '系统'}</td>
               <td>${new Date(tx.created_at).toLocaleString('zh-CN')}</td>
             </tr>
           `;
         }
 
-        // 会员流水
         const typeMap = { 'recharge': '充值', 'consume': '消费', 'refund': '退款', 'adjust': '调整' };
         const sign = tx.type === 'recharge' ? '+' : '-';
         return `
           <tr>
             <td>${tx.member?.nickname || tx.member?.phone || '--'}</td>
+            <td>${tx.player_name || '-'}</td>
             <td>${typeMap[tx.type] || tx.type}</td>
             <td>${sign} ¥${Number(tx.amount).toFixed(2)}</td>
             <td>¥${Number(tx.balance_after || 0).toFixed(2)}</td>
@@ -571,6 +604,7 @@
       const type = document.getElementById('actionType').value;
       const amount = parseFloat(document.getElementById('actionAmount').value);
       const remark = document.getElementById('actionRemark').value.trim();
+      const playerName = document.getElementById('playerName').value;
 
       if (!userId) { toast('请选择会员'); return; }
       if (!amount || amount <= 0) { toast('请输入有效金额'); return; }
@@ -591,7 +625,7 @@
             remark: remark || '消费',
             orderType: document.getElementById('orderType').value,
             gameName: document.getElementById('gameName').value.trim(),
-            playerName: document.getElementById('playerName').value.trim(),
+            playerName: playerName || '',
             duration: document.getElementById('duration').value.trim(),
             unitPrice: parseFloat(document.getElementById('unitPrice').value) || 0
           };
@@ -719,13 +753,13 @@
     document.getElementById('confirmGuest').addEventListener('click', async function() {
       const gameName = document.getElementById('guestGame').value;
       const orderType = document.getElementById('guestOrderType').value;
-      const playerName = document.getElementById('guestPlayerName').value.trim();
+      const playerName = document.getElementById('guestPlayerName').value;
       const amount = parseFloat(document.getElementById('guestAmount').value);
       const duration = document.getElementById('guestDuration').value.trim();
       const unitPrice = parseFloat(document.getElementById('guestUnitPrice').value) || 0;
       const remark = document.getElementById('guestRemark').value.trim();
 
-      if (!playerName) { toast('请输入陪玩昵称'); return; }
+      if (!playerName) { toast('请选择陪玩'); return; }
       if (!amount || amount <= 0) { toast('请输入有效金额'); return; }
 
       this.disabled = true;
@@ -789,6 +823,7 @@
       const user = await fetchSession();
       if (!user) return;
       loadMembers();
+      await loadPlayersForSelect();
     })();
   </script>
 </body>

@@ -45,16 +45,10 @@ async function getMemberNickname(userId) {
 
 async function getOperatorDisplay(userId) {
   if (!userId) return '系统';
-  
-  // 1. 优先查 member_profiles 的 nickname
   const nickname = await getMemberNickname(userId);
   if (nickname) return nickname;
-  
-  // 2. 查 auth.users 的 email
   const email = await getUserEmail(userId);
   if (email) return email;
-  
-  // 3. 回退：显示 ID 前8位
   return userId.substring(0, 8) + '...';
 }
 
@@ -229,6 +223,9 @@ async function changeMemberPassword(userId, oldPassword, newPassword) {
 //  交易流水
 // ============================================================
 
+/**
+ * 获取会员的所有流水（带操作人信息和陪玩名字）
+ */
 async function getMemberTransactions(userId) {
   const { data, error } = await supabase
     .from('member_transactions')
@@ -241,22 +238,38 @@ async function getMemberTransactions(userId) {
     return [];
   }
 
-  const withOperators = await Promise.all(
+  // 对每条交易，如果是消费，去 consumptions 表查 player_name
+  const withDetails = await Promise.all(
     data.map(async (tx) => {
+      let playerName = null;
+      // 只有消费类型才查陪玩名字
+      if (tx.type === 'consume' && tx.id) {
+        const { data: consume } = await supabase
+          .from('member_consumptions')
+          .select('player_name')
+          .eq('transaction_id', tx.id)
+          .maybeSingle();
+        if (consume) {
+          playerName = consume.player_name;
+        }
+      }
+
       const operatorDisplay = await getOperatorDisplay(tx.operator_id);
+
       return {
         ...tx,
-        operator: {
-          id: tx.operator_id,
-          email: operatorDisplay
-        }
+        player_name: playerName || null,
+        operator: { email: operatorDisplay }
       };
     })
   );
 
-  return withOperators;
+  return withDetails;
 }
 
+/**
+ * 获取所有流水（管理员/客服用）
+ */
 async function getAllTransactions() {
   const { data, error } = await supabase
     .from('member_transactions')
@@ -272,24 +285,35 @@ async function getAllTransactions() {
     data.map(async (tx) => {
       const operatorDisplay = await getOperatorDisplay(tx.operator_id);
 
-      let memberDisplay = '--';
+      let memberName = '--';
       if (tx.user_id) {
         const nickname = await getMemberNickname(tx.user_id);
         if (nickname) {
-          memberDisplay = nickname;
+          memberName = nickname;
         } else {
           const email = await getUserEmail(tx.user_id);
           if (email) {
-            memberDisplay = email;
+            memberName = email;
           }
         }
       }
 
+      let playerName = null;
+      if (tx.type === 'consume' && tx.id) {
+        const { data: consume } = await supabase
+          .from('member_consumptions')
+          .select('player_name')
+          .eq('transaction_id', tx.id)
+          .maybeSingle();
+        if (consume) playerName = consume.player_name;
+      }
+
       return {
         ...tx,
+        player_name: playerName || null,
         member: {
           id: tx.user_id,
-          nickname: memberDisplay
+          nickname: memberName
         },
         operator: {
           id: tx.operator_id,

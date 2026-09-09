@@ -105,6 +105,10 @@
     .tx-item .left .type.consume { color: #dc2626; }
     .tx-item .left .type.refund { color: #6366f1; }
     .tx-item .left .desc { font-size: .78rem; color: var(--sub); margin-top: .1rem; }
+    .tx-item .left .player {
+      font-size: .78rem; color: var(--orange); font-weight: 600;
+      margin-top: .1rem;
+    }
     .tx-item .left .time { font-size: .72rem; color: var(--light); margin-top: .2rem; }
     .tx-item .right {
       text-align: right; flex-shrink: 0;
@@ -350,12 +354,14 @@
         const typeClass = tx.type === 'recharge' ? 'recharge' : tx.type === 'consume' ? 'consume' : 'refund';
         const sign = tx.type === 'recharge' ? '+' : tx.type === 'consume' ? '-' : '±';
         const opName = tx.operator ? (tx.operator.email || '系统') : '系统';
+        const playerName = tx.player_name || '未指定';
 
         return `
           <div class="tx-item">
             <div class="left">
               <div class="type ${typeClass}">${typeMap[tx.type] || tx.type}</div>
               <div class="desc">${tx.description || ''}</div>
+              <div class="player">🎮 ${playerName}</div>
               <div class="time">${new Date(tx.created_at).toLocaleString('zh-CN')}</div>
             </div>
             <div class="right">
